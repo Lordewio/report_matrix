@@ -27,13 +27,13 @@ npm run dev
 
 Database migrations
 
-- The SQL migration is in `migrations/01_init.sql`. It creates `users`, `tasks`, `attachments`, and `reports` tables, the `reporting_area` enum, helper RPCs, and Row Level Security policies.
-- To apply the migration to your Supabase project use the `supabase` CLI or the SQL editor in the Supabase dashboard. Example using the CLI:
+- Migrations are in `supabase/migrations/`.
+- Apply them with Supabase CLI from the project root:
 
 ```bash
 supabase login
-supabase db remote set <your-db-connection-string>
-supabase db push migrations/01_init.sql
+supabase link --project-ref <your-project-ref>
+supabase db push
 ```
 
 Security notes
@@ -45,6 +45,24 @@ Deployment (Vercel)
 
 - Add the following environment variables in Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_REPORTS_BUCKET`.
 - Use the Vercel build command `npm run build` and the output directory will be managed by Next.js automatically.
+
+CI/CD setup (recommended)
+
+- CI is configured in `.github/workflows/ci.yml` and runs on pull requests and pushes to `main`.
+- CI steps: `npm ci`, `npm run lint`, `npm run build`.
+- Configure GitHub branch protection for `main`:
+	- Require pull request before merge.
+	- Require status checks to pass: `Lint and Build`.
+	- Disable direct pushes to `main`.
+
+Vercel CD flow
+
+- Import the GitHub repo into Vercel.
+- Set Production Branch to `main`.
+- Add environment variables in Vercel for both Preview and Production.
+- Result:
+	- Every PR gets a Vercel Preview deployment.
+	- Merge to `main` triggers production deployment.
 
 Applying migrations in production
 
