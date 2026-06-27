@@ -11,6 +11,7 @@ const AREAS = [
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<any[]>([])
+  const [userMap, setUserMap] = useState<Record<string, { name: string | null; email: string }>>({})
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [query, setQuery] = useState('')
@@ -22,9 +23,27 @@ export default function TasksPage() {
     let mounted = true
     ;(async () => {
       setErrorMessage('')
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+
+      let activeUsersById: Record<string, { name: string | null; email: string }> = {}
+      if (accessToken) {
+        const usersRes = await fetch('/api/users/active', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${accessToken}` }
+        })
+        const usersPayload = await usersRes.json().catch(() => ({}))
+        if (usersRes.ok) {
+          activeUsersById = (usersPayload.users || []).reduce((acc: Record<string, { name: string | null; email: string }>, item: any) => {
+            acc[item.id] = { name: item.name || null, email: item.email }
+            return acc
+          }, {})
+        }
+      }
+
       let result: any = await supabase
         .from('tasks')
-        .select('id,title,description,reporting_area,created_at,users(name)')
+        .select('id,title,description,reporting_area,created_at,author_id,users(name,email)')
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -32,7 +51,7 @@ export default function TasksPage() {
       if (result.error) {
         result = await supabase
           .from('tasks')
-          .select('id,title,description,reporting_area,created_at')
+          .select('id,title,description,reporting_area,created_at,author_id')
           .order('created_at', { ascending: false })
           .limit(50)
       }
@@ -44,7 +63,16 @@ export default function TasksPage() {
         setLoading(false)
         return
       }
-      const mapped = (result.data || []).map((r: any) => ({ ...r, author_name: r.users?.name || 'Unknown' }))
+      const mapped = (result.data || []).map((r: any) => ({
+        ...r,
+        author_name:
+          r.users?.name ||
+          r.users?.email ||
+          activeUsersById[r.author_id]?.name ||
+          activeUsersById[r.author_id]?.email ||
+          'Unknown'
+      }))
+      setUserMap(activeUsersById)
       setTasks(mapped)
       setLoading(false)
     })()
@@ -56,11 +84,27 @@ export default function TasksPage() {
     return subscribeTaskMutations((mutation) => {
       setTasks((prev) => {
         if (mutation.action === 'add') return [mutation.task, ...prev]
-        if (mutation.action === 'replace') return prev.map((t) => (t.id === mutation.tempId ? mutation.task : t))
+        if (mutation.action === 'replace') {
+          return prev.map((t) => {
+            if (t.id !== mutation.tempId) return t
+            const nextTask: any = mutation.task
+            return {
+              ...nextTask,
+              author_name:
+                nextTask?.author_name ||
+                nextTask?.users?.name ||
+                nextTask?.users?.email ||
+                userMap[nextTask?.author_id]?.name ||
+                userMap[nextTask?.author_id]?.email ||
+                t.author_name ||
+                'Unknown'
+            }
+          })
+        }
         return prev.filter((t) => t.id !== mutation.taskId)
       })
     })
-  }, [])
+  }, [userMap])
 
   useEffect(() => {
     setPage(1)

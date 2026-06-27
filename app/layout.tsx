@@ -6,6 +6,9 @@ import ToastHost from '../components/ToastHost'
 
 export const metadata = {
   title: 'UCC Reporting Matrix',
+  icons: {
+    icon: '/icon.svg'
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

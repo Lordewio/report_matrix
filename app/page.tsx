@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
   const [currentUserId, setCurrentUserId] = useState('')
+  const [currentUserLabel, setCurrentUserLabel] = useState('')
 
   useEffect(() => {
     let mounted = true
@@ -34,6 +35,18 @@ export default function DashboardPage() {
         return
       }
       setCurrentUserId(user.id)
+      const metadataName = (user.user_metadata?.name as string | undefined) || (user.user_metadata?.full_name as string | undefined) || ''
+      const email = user.email || ''
+      if (mounted) {
+        const label = metadataName.trim() ? `${metadataName}${email ? ` (${email})` : ''}` : (email || 'User')
+        setCurrentUserLabel(label)
+      }
+
+      const { data: userProfile } = await supabase.from('users').select('name,email').eq('id', user.id).single()
+      if (mounted && userProfile) {
+        const label = userProfile.name ? `${userProfile.name}${userProfile.email ? ` (${userProfile.email})` : ''}` : (userProfile.email || 'User')
+        setCurrentUserLabel(label)
+      }
 
       let result: any = await supabase
         .from('tasks')
@@ -101,6 +114,7 @@ export default function DashboardPage() {
   return (
     <section>
       <h1 className="text-2xl font-semibold mb-4">Dashboard</h1>
+      <p className="text-sm mb-2">Hello {currentUserLabel || 'there'}.</p>
       {!loading && !errorMessage && lastUpdatedAt && (
         <p className="text-xs ucc-muted mb-4">Last updated {lastUpdatedAt.toLocaleTimeString()}</p>
       )}

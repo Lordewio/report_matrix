@@ -56,6 +56,9 @@ export default function LoginPage() {
 
   return (
     <div className="max-w-md mx-auto mt-8">
+      <div className="mb-4 flex justify-center">
+        <img src="/ucc-logo.png" alt="Uganda Communications Commission" className="h-16 w-16 rounded-full object-cover shadow" onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/ucc-logo.svg' }} />
+      </div>
       <h1 className="text-xl font-semibold mb-4">Login</h1>
       <form onSubmit={handle} className="ucc-card p-4">
         {errorMessage && <p className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{errorMessage}</p>}

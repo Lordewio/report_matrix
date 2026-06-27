@@ -11,12 +11,13 @@ type TaskDetail = {
   reporting_area: string
   created_at: string
   author_id: string
-  users?: { name?: string | null } | null
+  users?: { name?: string | null; email?: string | null } | null
   attachments?: Array<{ id: string; file_url: string; uploaded_at: string }>
 }
 
 export default function TaskDetailPage({ params }: { params: { id: string } }) {
   const [task, setTask] = useState<TaskDetail | null>(null)
+  const [authorFallback, setAuthorFallback] = useState('')
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [currentUserId, setCurrentUserId] = useState('')
@@ -30,9 +31,12 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
       const { data: authData } = await supabase.auth.getUser()
       if (mounted) setCurrentUserId(authData.user?.id || '')
 
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+
       let result: any = await supabase
         .from('tasks')
-        .select('id,title,description,reporting_area,created_at,author_id,users(name),attachments(id,file_url,uploaded_at)')
+        .select('id,title,description,reporting_area,created_at,author_id,users(name,email),attachments(id,file_url,uploaded_at)')
         .eq('id', params.id)
         .is('deleted_at', null)
         .single()
@@ -50,6 +54,20 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
         setErrorMessage(result.error?.message || 'Task not found.')
         setLoading(false)
         return
+      }
+
+      if (accessToken && result.data.author_id) {
+        const usersRes = await fetch('/api/users/active', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${accessToken}` }
+        })
+        const usersPayload = await usersRes.json().catch(() => ({}))
+        if (usersRes.ok) {
+          const matched = (usersPayload.users || []).find((item: any) => item.id === result.data.author_id)
+          if (mounted && matched) {
+            setAuthorFallback(matched.name || matched.email || '')
+          }
+        }
       }
 
       setTask(result.data as TaskDetail)
@@ -164,7 +182,7 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
         <div>
           <h2 className="text-xl font-semibold">{task.title}</h2>
           <p className="text-xs ucc-muted mt-1">
-            {new Date(task.created_at).toLocaleString()} • {task.reporting_area} • {task.users?.name || 'Unknown'}
+            {new Date(task.created_at).toLocaleString()} • {task.reporting_area} • {task.users?.name || task.users?.email || authorFallback || 'Unknown'}
           </p>
         </div>
 

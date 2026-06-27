@@ -33,7 +33,7 @@ export async function GET(req: Request) {
 
     const { data, error, count } = await serverSupabase
       .from('tasks')
-      .select('id,title,description,reporting_area,created_at,deleted_at,deleted_by,users(name)', { count: 'exact' })
+      .select('id,title,description,reporting_area,created_at,deleted_at,deleted_by,users(name,email)', { count: 'exact' })
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false })
       .range(from, to)

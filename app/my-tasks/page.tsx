@@ -22,6 +22,7 @@ export default function MyTasksPage() {
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editArea, setEditArea] = useState('')
+  const [editAttachmentFiles, setEditAttachmentFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const pageSize = 10
 
@@ -42,7 +43,7 @@ export default function MyTasksPage() {
 
       let result: any = await supabase
         .from('tasks')
-        .select('id,title,description,reporting_area,created_at,deleted_at,users(name)')
+        .select('id,title,description,reporting_area,created_at,deleted_at,users(name,email)')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false })
         .limit(100)
@@ -67,7 +68,7 @@ export default function MyTasksPage() {
       const mapped = (result.data || []).map((r: any) => ({
         ...r,
         deleted_at: (r as any).deleted_at || null,
-        author_name: r.users?.name || 'Unknown'
+        author_name: r.users?.name || r.users?.email || 'Unknown'
       }))
       setTasks(mapped)
       setLoading(false)
@@ -81,6 +82,7 @@ export default function MyTasksPage() {
     setEditTitle(task.title || '')
     setEditDescription(task.description || '')
     setEditArea(task.reporting_area || AREAS[1])
+    setEditAttachmentFiles([])
   }
 
   function cancelEdit() {
@@ -88,6 +90,7 @@ export default function MyTasksPage() {
     setEditTitle('')
     setEditDescription('')
     setEditArea('')
+    setEditAttachmentFiles([])
   }
 
   async function saveEdit(taskId: string) {
@@ -112,6 +115,31 @@ export default function MyTasksPage() {
       return
     }
 
+    let uploadedCount = 0
+    let attachmentFailures = 0
+
+    for (let index = 0; index < editAttachmentFiles.length; index += 1) {
+      const file = editAttachmentFiles[index]
+      const path = `${taskId}/${Date.now()}-${index}-${file.name}`
+      const { error: uploadError } = await supabase.storage.from('attachments').upload(path, file)
+      if (uploadError) {
+        attachmentFailures += 1
+        continue
+      }
+
+      const url = supabase.storage.from('attachments').getPublicUrl(path).data.publicUrl
+      const { error: attachmentError } = await supabase
+        .from('attachments')
+        .insert([{ task_id: taskId, file_url: url }])
+
+      if (attachmentError) {
+        attachmentFailures += 1
+        continue
+      }
+
+      uploadedCount += 1
+    }
+
     setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, ...updates } : task)))
     emitTaskMutation({
       action: 'replace',
@@ -124,7 +152,22 @@ export default function MyTasksPage() {
     })
     cancelEdit()
     setSaving(false)
-    emitToast({ type: 'success', message: 'Task updated successfully.' })
+
+    if (attachmentFailures > 0) {
+      emitToast({
+        type: 'error',
+        message:
+          uploadedCount > 0
+            ? `Task updated. ${uploadedCount} attachment(s) added, ${attachmentFailures} failed.`
+            : 'Task updated, but attachment upload failed.'
+      })
+      return
+    }
+
+    emitToast({
+      type: 'success',
+      message: uploadedCount > 0 ? `Task and ${uploadedCount} attachment(s) updated successfully.` : 'Task updated successfully.'
+    })
   }
 
   async function deleteTask(taskId: string) {
@@ -257,6 +300,17 @@ export default function MyTasksPage() {
                 <select value={editArea} onChange={(e) => setEditArea(e.target.value)} className="ucc-input">
                   {AREAS.slice(1).map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
+              </label>
+              <label className="block mb-2 text-sm">Add attachments
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => setEditAttachmentFiles(Array.from(e.target.files || []))}
+                  className="ucc-input"
+                />
+                <span className="mt-1 block text-xs ucc-muted">
+                  {editAttachmentFiles.length > 0 ? `${editAttachmentFiles.length} file(s) selected` : 'Select files to add to this task'}
+                </span>
               </label>
               <div className="mt-3 flex gap-2">
                 <button type="button" disabled={saving || !editTitle.trim()} onClick={() => saveEdit(t.id)} className="ucc-btn-sm disabled:opacity-50">{saving ? 'Saving...' : 'Save changes'}</button>
