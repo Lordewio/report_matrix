@@ -182,7 +182,7 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
         <div>
           <h2 className="text-xl font-semibold">{task.title}</h2>
           <p className="text-xs ucc-muted mt-1">
-            {new Date(task.created_at).toLocaleString()} • {task.reporting_area} • {task.users?.name || task.users?.email || authorFallback || 'Unknown'}
+            {new Date(task.created_at).toLocaleString()} • {task.reporting_area} • {task.users?.name || task.users?.email || authorFallback || (task.author_id ? `User ${String(task.author_id).slice(0, 8)}` : 'User')}
           </p>
         </div>
 

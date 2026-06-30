@@ -10,6 +10,7 @@ type ArchivedTask = {
   description: string | null
   reporting_area: string
   created_at: string
+  author_name?: string | null
   deleted_at: string | null
   deleted_by: string | null
   users?: { name?: string | null; email?: string | null } | null
@@ -132,7 +133,7 @@ export default function AdminArchivedTasksPage() {
                 <tr key={task.id} className="border-b align-top">
                   <td className="py-2 pr-3">{task.title}</td>
                   <td className="py-2 pr-3">{task.reporting_area}</td>
-                  <td className="py-2 pr-3">{task.users?.name || task.users?.email || 'Unknown'}</td>
+                  <td className="py-2 pr-3">{task.author_name || task.users?.name || task.users?.email || 'User'}</td>
                   <td className="py-2 pr-3">{task.deleted_at ? new Date(task.deleted_at).toLocaleString() : '—'}</td>
                   <td className="py-2">
                     <div className="flex flex-col gap-2">

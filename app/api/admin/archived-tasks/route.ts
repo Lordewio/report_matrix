@@ -33,15 +33,43 @@ export async function GET(req: Request) {
 
     const { data, error, count } = await serverSupabase
       .from('tasks')
-      .select('id,title,description,reporting_area,created_at,deleted_at,deleted_by,users(name,email)', { count: 'exact' })
+      .select('id,title,description,reporting_area,created_at,author_id,deleted_at,deleted_by,users(name,email)', { count: 'exact' })
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false })
       .range(from, to)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+    const rows = data || []
+    const authorIds = Array.from(new Set(rows.map((item: any) => item.author_id).filter(Boolean)))
+
+    let usersById: Record<string, { name: string | null; email: string | null }> = {}
+    if (authorIds.length > 0) {
+      const usersRes = await serverSupabase
+        .from('users')
+        .select('id,name,email')
+        .in('id', authorIds)
+
+      if (!usersRes.error) {
+        usersById = (usersRes.data || []).reduce((acc: Record<string, { name: string | null; email: string | null }>, user: any) => {
+          acc[user.id] = { name: user.name || null, email: user.email || null }
+          return acc
+        }, {})
+      }
+    }
+
+    const tasks = rows.map((item: any) => ({
+      ...item,
+      author_name:
+        item.users?.name ||
+        item.users?.email ||
+        usersById[item.author_id]?.name ||
+        usersById[item.author_id]?.email ||
+        (item.author_id ? `User ${String(item.author_id).slice(0, 8)}` : 'User')
+    }))
+
     return NextResponse.json({
-      tasks: data || [],
+      tasks,
       count: count || 0,
       page,
       pageSize

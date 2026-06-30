@@ -52,6 +52,7 @@ export default function TasksPage() {
         result = await supabase
           .from('tasks')
           .select('id,title,description,reporting_area,created_at,author_id')
+          .is('deleted_at', null)
           .order('created_at', { ascending: false })
           .limit(50)
       }
@@ -70,7 +71,7 @@ export default function TasksPage() {
           r.users?.email ||
           activeUsersById[r.author_id]?.name ||
           activeUsersById[r.author_id]?.email ||
-          'Unknown'
+          (r.author_id ? `User ${String(r.author_id).slice(0, 8)}` : 'User')
       }))
       setUserMap(activeUsersById)
       setTasks(mapped)
@@ -97,7 +98,7 @@ export default function TasksPage() {
                 userMap[nextTask?.author_id]?.name ||
                 userMap[nextTask?.author_id]?.email ||
                 t.author_name ||
-                'Unknown'
+                (nextTask?.author_id ? `User ${String(nextTask.author_id).slice(0, 8)}` : 'User')
             }
           })
         }

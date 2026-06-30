@@ -87,7 +87,7 @@ export default function ReportsPage() {
                     ? (userMap[r.generated_by]
                       ? `${userMap[r.generated_by].name || userMap[r.generated_by].email} (${userMap[r.generated_by].email})`
                       : 'Deactivated or unavailable user')
-                    : 'Unknown'}
+                    : 'User'}
                 </div>
                 <div className="mt-1"><a className="ucc-link" href={r.url} target="_blank">Download</a></div>
               </li>

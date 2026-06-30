@@ -24,6 +24,7 @@ export default function MyTasksPage() {
   const [editArea, setEditArea] = useState('')
   const [editAttachmentFiles, setEditAttachmentFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
+  const [deletingArchivedTaskId, setDeletingArchivedTaskId] = useState('')
   const pageSize = 10
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function MyTasksPage() {
       const mapped = (result.data || []).map((r: any) => ({
         ...r,
         deleted_at: (r as any).deleted_at || null,
-        author_name: r.users?.name || r.users?.email || 'Unknown'
+        author_name: r.users?.name || r.users?.email || user.email || 'User'
       }))
       setTasks(mapped)
       setLoading(false)
@@ -214,6 +215,32 @@ export default function MyTasksPage() {
     emitToast({ type: 'success', message: 'Task restored successfully.' })
   }
 
+  async function permanentlyDeleteArchivedTask(taskId: string) {
+    if (!currentUserId) return
+    const confirmed = window.confirm('Delete this archived task permanently? This cannot be undone.')
+    if (!confirmed) return
+
+    setDeletingArchivedTaskId(taskId)
+
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', taskId)
+      .eq('author_id', currentUserId)
+      .not('deleted_at', 'is', null)
+
+    if (error) {
+      emitToast({ type: 'error', message: error.message || 'Failed to permanently delete archived task.' })
+      setDeletingArchivedTaskId('')
+      return
+    }
+
+    setTasks((prev) => prev.filter((task) => task.id !== taskId))
+    emitTaskMutation({ action: 'remove', taskId })
+    setDeletingArchivedTaskId('')
+    emitToast({ type: 'success', message: 'Archived task deleted permanently.' })
+  }
+
   useEffect(() => {
     return subscribeTaskMutations((mutation) => {
       setTasks((prev) => {
@@ -329,7 +356,17 @@ export default function MyTasksPage() {
                       <button type="button" onClick={() => deleteTask(t.id)} className="ucc-btn-sm">Archive</button>
                     </>
                   ) : (
-                    <button type="button" onClick={() => restoreTask(t.id)} className="ucc-btn-sm">Restore</button>
+                    <>
+                      <button type="button" onClick={() => restoreTask(t.id)} className="ucc-btn-sm">Restore</button>
+                      <button
+                        type="button"
+                        onClick={() => permanentlyDeleteArchivedTask(t.id)}
+                        disabled={deletingArchivedTaskId === t.id}
+                        className="ucc-btn-sm disabled:opacity-50"
+                      >
+                        {deletingArchivedTaskId === t.id ? 'Deleting...' : 'Delete Permanently'}
+                      </button>
+                    </>
                   )}
                 </>
               )}

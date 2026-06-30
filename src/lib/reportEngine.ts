@@ -7,6 +7,7 @@ type TaskRow = {
   description: string
   reporting_area: string
   created_at: string
+  author_id?: string | null
   author_name: string
 }
 
@@ -22,7 +23,7 @@ export async function compileTasks(startDate: string, endDate: string, filters: 
   let q = await applyFilters(
     serverSupabase
       .from('tasks')
-      .select('id, title, description, reporting_area, created_at, users(name)')
+      .select('id, title, description, reporting_area, created_at, author_id, users(name,email)')
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
   )
@@ -31,7 +32,7 @@ export async function compileTasks(startDate: string, endDate: string, filters: 
     q = await applyFilters(
       serverSupabase
         .from('tasks')
-        .select('id, title, description, reporting_area, created_at, users(name)')
+        .select('id, title, description, reporting_area, created_at, author_id, users(name,email)')
         .order('created_at', { ascending: false })
     )
   }
@@ -40,7 +41,7 @@ export async function compileTasks(startDate: string, endDate: string, filters: 
     q = await applyFilters(
       serverSupabase
         .from('tasks')
-        .select('id, title, description, reporting_area, created_at')
+        .select('id, title, description, reporting_area, created_at, author_id')
         .order('created_at', { ascending: false })
     )
   }
@@ -48,6 +49,22 @@ export async function compileTasks(startDate: string, endDate: string, filters: 
   if (q.error) throw q.error
 
   const rows = q.data || []
+  const authorIds = Array.from(new Set((rows || []).map((r: any) => r.author_id).filter(Boolean)))
+
+  let usersById: Record<string, { name: string | null; email: string | null }> = {}
+  if (authorIds.length > 0) {
+    const usersRes = await serverSupabase
+      .from('users')
+      .select('id,name,email')
+      .in('id', authorIds)
+
+    if (!usersRes.error) {
+      usersById = (usersRes.data || []).reduce((acc: Record<string, { name: string | null; email: string | null }>, user: any) => {
+        acc[user.id] = { name: user.name || null, email: user.email || null }
+        return acc
+      }, {})
+    }
+  }
 
   const tasks: TaskRow[] = (rows || []).map((r: any) => ({
     id: r.id,
@@ -55,7 +72,14 @@ export async function compileTasks(startDate: string, endDate: string, filters: 
     description: r.description,
     reporting_area: r.reporting_area,
     created_at: r.created_at,
-    author_name: r.author_name || r.users?.name || 'Unknown'
+    author_id: r.author_id || null,
+    author_name:
+      r.author_name ||
+      r.users?.name ||
+      r.users?.email ||
+      usersById[r.author_id]?.name ||
+      usersById[r.author_id]?.email ||
+      (r.author_id ? `User ${String(r.author_id).slice(0, 8)}` : 'User')
   }))
 
   // Group by area
